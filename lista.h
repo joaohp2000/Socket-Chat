@@ -22,9 +22,12 @@ void copiar(char * msg_buf, celula *le){
     p=le;
     int i=0;
     while(p != NULL){
+      if(p->conteudo.online==1){
         bcopy( &(p->conteudo), msg_buf+i*sizeof(elemento),sizeof(elemento) );
+         i++;
+      }
         p=p->prox;
-        i++;
+
     }
 }
 
@@ -54,12 +57,18 @@ void busca_e_remove (elemento y, celula * *le)
    celula *p, *q;
    p = *le;
    q = *le;
-   while (q != NULL && (strcmp(y.user_name, p->conteudo.user_name))!=0) {
+   while ((strcmp(y.user_name, q->conteudo.user_name))!=0) {
       p = q;
       q = q->prox;
    }
-   if (q != NULL) {
+   if (q == p) {
+      *le=p->prox;
+      free(p);
+      
+   }
+   else{
       p->prox = q->prox;
       free (q);
+      
    }
 }
