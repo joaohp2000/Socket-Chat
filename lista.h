@@ -23,6 +23,7 @@ void copiar(char * msg_buf, celula *le){
     int i=0;
     while(p != NULL){
       if(p->conteudo.online==1){
+       //  printf("%s\n", p->conteudo.user_name);
         bcopy( &(p->conteudo), msg_buf+i*sizeof(elemento),sizeof(elemento) );
          i++;
       }

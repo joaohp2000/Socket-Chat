@@ -10,11 +10,13 @@
 #include <netdb.h>
 #include <arpa/inet.h>
 #include <pthread.h> /* para poder manipular threads */
+#include <unistd.h>
 
 pthread_t recebe;
 pthread_mutex_t lock;
 pthread_mutex_t lock2;
-
+pthread_mutex_t lock3;
+int resposta;
 struct clientes{
     char user_name[24];
     int so;
@@ -42,7 +44,7 @@ void lista_de_contatos(struct mensagem lista_nomes, char *meu_nome);
 void le_linha(FILE * arquivo, char *linha);
 void envia_arquivo(struct mensagem contato);
 void recebe_arquivo(int sock,int sock_contato);
-void grupos(int sock);
+void grupos(int sock, char *user_name);
 void *envia(void *sock_)
 {
     char user_name[20];
@@ -69,6 +71,10 @@ void *envia(void *sock_)
         usuarios_online(msg, user_name);
         pthread_mutex_unlock(&lock);
 
+    }
+    if(msg.codigo == 3){
+        resposta= msg.resposta;
+        pthread_mutex_unlock(&lock3);
     }
     if(msg.codigo==4){
         lista_de_contatos(msg, user_name);
@@ -104,7 +110,7 @@ int main(){
 	struct hostent *hp, *gethostbyname();
 	char buf[1024];
 
-
+   
     struct clientes *cli1=&cli;
     struct mensagem *msg1=&msg;
     void *sock_name;
@@ -158,6 +164,11 @@ int main(){
         printf("\n mutex init failed\n");
         return 1;
     }
+    if (pthread_mutex_init(&lock3, NULL) != 0)
+    {
+        printf("\n mutex init failed\n");
+        return 1;
+    }
 
     tp = pthread_create(&(recebe), NULL, envia,sock_name);
         if (tp)
@@ -174,7 +185,9 @@ int main(){
 void menu_primario(int sock, struct sockaddr_in name, char *user_name){
 
     int menu;
-    
+    FILE *lista_de_contatos;
+    lista_de_contatos=fopen("lista_de_contatos.txt", "a");
+    fclose(lista_de_contatos);
     struct mensagem msg;
     int tam;
     tam=sizeof(name);
@@ -199,6 +212,7 @@ void menu_primario(int sock, struct sockaddr_in name, char *user_name){
 }
 void usuarios_online(struct mensagem lista_nomes, char *meu_nome){
     struct clientes *lista;
+    system("clear");
     if(lista_nomes.resposta!=1){
         lista = malloc(sizeof(lista_nomes.buf));
         printf("\nLista de Usuario Online\n");
@@ -224,11 +238,13 @@ void menu_secundario(int sock, struct sockaddr_in name, char * user_name, struct
         printf("2-Lista de Seus contatos\n");
         printf("3-Iniciar Conversa\n");
         printf("4-Realizar Descadastro\n");
-        printf("5-Sair\n");
+        printf("5-Iniciar Chat em grupo\n");
+        printf("6-Sair\n");
         printf("\n Escolha uma opção:");
         __fpurge(stdin);
         scanf("%d", &menu);
         if(menu==1){ //l=usuarios online
+
             msg->codigo= 2;
             msg2.codigo=2;
             if (send (sock, (char *)&msg2, sizeof msg2, 0) < 0) 
@@ -242,20 +258,22 @@ void menu_secundario(int sock, struct sockaddr_in name, char * user_name, struct
 
         }
         if(menu==3){ //iniciar conversa
+            system("clear");
             pthread_mutex_unlock(&lock);
+            pthread_mutex_lock(&lock3);
             char mensagem[1003];
             printf("Com quem deseja iniciar uma conversa?:");
             printf("Digite o user name:");
             scanf("%s",msg2.buf);
-            msg->codigo=3;
             msg2.codigo=3;
-
             name.sin_family = AF_INET;
             if (send (sock, (char *)&msg2, sizeof msg2, 0) < 0) 
             perror("Envio da mensagem");
+            pthread_mutex_lock(&lock3);
+            if(resposta!=-1){
             while(1){
                 pthread_mutex_lock(&lock2);
-                msg->codigo=10;
+
                 msg2.codigo=10;
                 __fpurge(stdin);
                 fgets(mensagem, 1003, stdin);
@@ -268,7 +286,7 @@ void menu_secundario(int sock, struct sockaddr_in name, char * user_name, struct
                     break;
                 }
                 if(strcmp(mensagem, "arquivo()\n\0" )==0){
-                    msg->codigo=11;
+
                     msg2.codigo=11;
                                     
                     if (send (sock, (char *)&msg2, sizeof msg2, 0) < 0) 
@@ -278,24 +296,40 @@ void menu_secundario(int sock, struct sockaddr_in name, char * user_name, struct
                 else{
                 
                 sprintf(msg2.buf,"\n[%s]:%s",user_name, mensagem);
-                pthread_mutex_unlock(&lock2);
+                
                 if (send (sock, (char *)&msg2, sizeof msg2, 0) < 0) 
                     perror("Envio da mensagem");
-                
+                pthread_mutex_unlock(&lock2);
                 }
             }
-            
-
+    
             }
+            pthread_mutex_unlock(&lock3);
+        }
+        if(menu==4){
+            printf("Realizando Descadastro\n");
+            msg2.codigo=5;
+                if (send (sock, (char *)&msg2, sizeof msg2, 0) < 0) 
+            perror("Envio da mensagem");
+            pthread_mutex_destroy(&lock);
+            pthread_mutex_destroy(&lock2);
+            close(sock);
+            exit(0);
+        }
         if(menu==5){
+            pthread_mutex_unlock(&lock);
+            grupos(sock, user_name);
+        }
+        if(menu==6){
                 printf("Saindo.......");
-                msg->codigo=5;
-                msg2.codigo=5;
+                msg2.codigo=6;
 
                 sprintf(msg->buf, "%s", user_name);
                 if (send (sock, (char *)&msg2, sizeof msg2, 0) < 0) 
                     perror("Envio da mensagem");
                 pthread_mutex_destroy(&lock);
+                pthread_mutex_destroy(&lock2);
+                close(sock);
                 exit(0);
 
             }
@@ -310,7 +344,7 @@ void lista_de_contatos(struct mensagem lista_nomes, char *meu_nome){
     int lenz, flag, entrada=0;
     size_t len=20; // valor arbitrário
     char *linha= malloc(len);
-
+    system("clear");
     __fpurge(stdout);
     __fpurge(stdout);
        
@@ -369,12 +403,12 @@ void lista_de_contatos(struct mensagem lista_nomes, char *meu_nome){
         default:
             break;
         }
-      
     }
     free(linha);
 
 }
 void envia_arquivo(struct mensagem contato){
+    system("clear");
     int sock;
     sock = socket(AF_INET, SOCK_STREAM, 0);
     struct hostent *hp, *gethostbyname();
@@ -404,7 +438,11 @@ void envia_arquivo(struct mensagem contato){
 /*
     printf("CCC Conexao realizada com o servidor:\n");
     printf("CCC  IP: %s   porta:%d \n\n", inet_ntoa(contatin.sin_addr), contatin.sin_port);
-     */ printf("Digite o nome do arquivo que deseja enviar:");
+    
+     */ 
+    printf("Seus arquivos:\n");
+    system("ls");
+    printf("Digite o nome do arquivo que deseja enviar:");
   struct send_file buff;
     __fpurge(stdin);
     scanf("%s", buff.nome_arquivo);
@@ -506,77 +544,47 @@ void recebe_arquivo(int sock, int sock_contato){
     printf("fim\n");
 
 }
-/*
-void grupos(int sock){
-     FILE *lista_de_contato;
-    struct clientes *lista;
-    int lenz, flag, entrada=0;
-    size_t len=20; // valor arbitrário
-    char *linha= malloc(len);
 
-    __fpurge(stdout);
-    __fpurge(stdout);
-       
-      printf("\n Meus Grupos\n");
-      lista = malloc(sizeof(lista_nomes.buf));
-
-    while(entrada != 3){
-
-        printf("1-Adicionar Grupo\n");
-        printf("2-Ver minha lista  \n");
-        printf("3-Iniciar Conversa em Grupo\n");
-        printf("4-Voltar ao menu principal\n");
-        printf("\n Escolha uma opção:");
+void grupos(int sock, char *user_name){
+    system("clear");
+    struct mensagem msg2; 
+    char linha[10][20];
+    int l;
+    char mensagem[1003];
+    printf("Digite quantas pessoas e seus nomes:");
+    scanf("%d", &l);
+    for(int i=0; i<l;i++){
+        scanf("%s", linha[i]);
+    }
+    while(1){
+        
         __fpurge(stdin);
-        scanf("%d", &entrada);
-        switch (entrada){
-        case 1:
-            
-            lista_de_contato=fopen("lista_de_contatos.txt", "a");
-            char contato[20];
-            printf("Nome do Contato:");
-            __fpurge(stdin);
-            scanf("%s", contato);
-            fprintf(lista_de_contato, "%s\n", contato);
-            fclose(lista_de_contato);
-            break;
+        fgets(mensagem, 1003, stdin);
 
-        case 2:
-            bcopy(lista_nomes.buf, lista, sizeof(lista_nomes.buf));
-            printf("\n\nMinha lista de Contatos\n\n");
-            lista_de_contato=fopen("lista_de_contatos.txt", "r");
-            if (!lista_de_contato)
-              {
-                perror("lista_de_contatos.txt");
-                exit(1);
-              }
-            while (getline(&linha, &len, lista_de_contato) > 0){
-                lenz = strlen(linha); 
-                if(strcmp("Grupos:", linha)==0 || strcmp("Grupos:", linha)==0)
-                    break;                 
-                if( linha[lenz-1] == '\n' ) linha[lenz-1] = 0;
-                flag=0;
-                for(int i=0; i<lista_nomes.resposta-1; i++){
-                    if(strcmp(meu_nome, lista[i].user_name)!=0){
-                        if(strcmp(lista[i].user_name, linha)==0){
-                            printf("%s     [ONLINE]\n", linha);
-                            flag=1;
-                        }
-                    }
-                }
-                if(flag==0){
-                    printf("%s     [OFFLINE]\n", linha);
-                }
-              }
-            
-            fclose(lista_de_contato);
-            break;
-
-        default:
+        if(strcmp(mensagem, "<voltar\n\0" )==0) 
+        {
             break;
         }
-      
+        else{
+            for(int i=0; i<l;i++){
+                pthread_mutex_lock(&lock3);
+                msg2.codigo=3;
+                bcopy(linha[i], msg2.buf, 20 );
+                if (send (sock, (char *)&msg2, sizeof msg2, 0) < 0) 
+                    perror("Envio da mensagem");
+                pthread_mutex_lock(&lock3);
+                if(resposta!=-1){
+                msg2.codigo=10;
+                sprintf(msg2.buf,"\n[%s]:%s",user_name, mensagem);
+                if (send (sock, (char *)&msg2, sizeof msg2, 0) < 0) 
+                    perror("Envio da mensagem");
+                pthread_mutex_unlock(&lock3);
+                usleep(500);
+                }
+        
+        }
+            }
+
     }
-    free(linha);
+        
 }
-*/

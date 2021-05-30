@@ -29,7 +29,8 @@ typedef struct clientes elemento;
 #include "lista.h"
 
 celula *lista = NULL;
-int indice=1;
+
+int count_online=1, count_total=1;
 
 struct mensagem{
   int codigo;
@@ -47,20 +48,22 @@ void escrever_arquivo(char *nome, char *meu_nome, struct mensagem msg);
 void ler_arquivo(char *nome, char *meu_nome,int sock);
 void *user(void * sock){
   struct thread_param * sock_id = (struct thread_param *)sock;
+  
+  celula *contato, *cliente;
 
+  
 	int rval;
   struct mensagem msg;
   int contato_online;
   struct sockaddr_in _cli;
-  struct clientes cli;
-  struct clientes cli2;
-  cli.sock=sock_id->msgsock;
+  struct clientes cli, cli2;
+
+
+
   bcopy(&client[sock_id->thread_num], &_cli, sizeof(_cli) );
    if (sock_id->msgsock==-1)
 			perror("accept");
 		else do {
-      printf("SSSS   Conexão com cliente:\n");
-      printf("SSSSS  IP: %s   porta:%d \n\n", inet_ntoa(_cli.sin_addr), _cli.sin_port);
 
       printf("SSSS   msgsock:%d \n\n", sock_id->msgsock);
 
@@ -72,8 +75,9 @@ void *user(void * sock){
       {
 				printf("Ending connection\n");
         printf("Vaaai\n");
-        busca_e_remove(cli, &lista);
-        indice--;
+        //busca_e_remove(cli, &lista);
+        cliente->conteudo.online=0;
+        count_online--;
         close (sock_id->msgsock);
         pthread_exit(NULL);
 		    break;
@@ -85,97 +89,122 @@ void *user(void * sock){
           printf("Realizando login!\n");
           printf("DDDD  Familia: %d\n", _cli.sin_family);
           printf("DDDD  Endereco: %s\n", inet_ntoa(_cli.sin_addr));
-          printf("DDDD  Porta: %d\n\n", _cli.sin_port);
-          
+          printf("DDDD  Porta: %d\n", _cli.sin_port);
+          printf("SSSS   Meu sock:%d \n", sock_id->msgsock);
+          printf("Meu nome:%s\n", msg.buf);
           cli.online=1;
           sprintf(cli.user_name, "%s", msg.buf);
-          msg.resposta=indice;
+          msg.resposta=count_online;
+          cli.sock=sock_id->msgsock;
+          cliente=busca(cli, lista);
+          if(cliente == NULL){
+            printf("realizando cadastro do cliente");
+            insere(cli, &lista);
+            cliente=busca(cli, lista);
+            count_total++;
+          }
+          else{
+            printf("cliente encontrado");
+          }
 
-          insere(cli, &lista);
+          cliente->conteudo.online=1;
+          cliente->conteudo.sock=sock_id->msgsock;
+          //sprintf(cliente->conteudo.user_name, "tessssste" );
+
           copiar(msg.buf, lista);
           if (send (sock_id->msgsock, (char *)&msg, sizeof msg, 0) < 0) 
-            perror("Envio da mensagem");
-          indice++;
+          perror("Envio da mensagem");
+
+          
+          count_online++;
           break;
         case 2:
-          printf("Usuários Logados:\n");
-          printf("DDDD  Familia: %d\n", _cli.sin_family);
-          printf("DDDD  Endereco: %s\n", inet_ntoa(_cli.sin_addr));
-          printf("DDDD  Porta: %d\n\n", _cli.sin_port);
-          msg.resposta=indice;
+          msg.resposta=count_online;
           msg.codigo=2;
           copiar(msg.buf, lista);
           if (send (sock_id->msgsock, (char *)&msg, sizeof msg, 0) < 0) 
             perror("Envio da mensagem");
           break;
         case 3:
-        printf("buscando usuario\n");
-        
-        celula *user;
-        user=NULL;
-        user = malloc(sizeof(celula *));
-        sprintf(user->conteudo.user_name,"%s", msg.buf);
-        //printf("%s", user->conteudo.user_name);
-        //scanf("%d", &x);
-        sprintf(cli2.user_name, "%s",msg.buf );
-        user=busca(user->conteudo, lista);
-        
-        msg.codigo=3;
-        if(user==NULL){
-        printf("Nao encontrado\n\n");
-        contato_online=0;
-        msg.resposta=-1;
-          if (send (sock_id->msgsock, (char *)&msg, sizeof msg, 0) < 0) 
-            perror("Envio da mensagem");
-        }
-        else{
-          contato_online=1;
-          bcopy(&(user->conteudo), &cli2, sizeof(elemento));
-      //    sprintf(msg.buf, "%s", user->conteudo);
-          printf ("sock conversa : %d", cli2.sock);
-          printf("      nome:%s\n", cli2.user_name);
-          msg.resposta=1;
-  
-          if (send (sock_id->msgsock, (char *)&msg, sizeof msg, 0) < 0) 
-            perror("Envio da mensagem");
-        }
-        ler_arquivo(cli2.user_name,cli.user_name,sock_id->msgsock);
-      
-        
+
+
+          printf("buscando usuario\n");
+          sprintf(cli2.user_name,"%s", msg.buf);
+          //printf("%s", contato->conteudo.user_name);
+          //scanf("%d", &x);
+          //sprintf(contato->conteudo.user_name, "%s",msg.buf );
+          contato=busca(cli2, lista);
+
+          msg.codigo=3;
+          if(contato==NULL){
+          printf("Nao encontrado\n\n");
+          msg.resposta=-1;
+            if (send (sock_id->msgsock, (char *)&msg, sizeof msg, 0) < 0) 
+              perror("Envio da mensagem");
+          }
+          else{
+            if(contato->conteudo.online==1){
+                msg.resposta=1;
+ //             bcopy(&(contato->conteudo), &cli2, sizeof(elemento));
+        //      sprintf(msg.buf, "%s", contato->conteudo);
+              printf ("de %s para  sock conversa : %d",cliente->conteudo.user_name, contato->conteudo.sock);
+              printf("      nome:%s\n", contato->conteudo.user_name);
+              if (send (sock_id->msgsock, (char *)&msg, sizeof msg, 0) < 0) 
+                perror("Envio da mensagem");
+
+            }
+            else{
+  //            bcopy(&(contato->conteudo), &cli2, sizeof(elemento));
+              msg.resposta=0;
+              if (send (sock_id->msgsock, (char *)&msg, sizeof msg, 0) < 0) 
+                perror("Envio da mensagem");
+            }
+            ler_arquivo(contato->conteudo.user_name,cli.user_name,sock_id->msgsock);
+          }
+
           break;
         case 4:
-          printf("Usuários Logados:\n");
-          printf("DDDD  Familia: %d\n", _cli.sin_family);
-          printf("DDDD  Endereco: %s\n", inet_ntoa(_cli.sin_addr));
-          printf("DDDD  Porta: %d\n\n", _cli.sin_port);
-          msg.resposta=indice;
+          msg.resposta=count_online;          
           msg.codigo=4;
           copiar(msg.buf, lista);
           if (send (sock_id->msgsock, (char *)&msg, sizeof msg, 0) < 0) 
             perror("Envio da mensagem");
           break;
         case 5:
+            printf("Descadastrando Usuario");
+            count_online--;
+            count_total--;
+            busca_e_remove(cliente->conteudo, &lista);
+            close (sock_id->msgsock);
+          pthread_exit(NULL);     
+        case 6:
           printf("Vaaai\n");
-          busca_e_remove(cli, &lista);
-          indice--;
+          //busca_e_remove(cli, &lista);
+          cliente->conteudo.online=0;
+          cliente->conteudo.sock=0;
+         // contato->conteudo.online=0;
+          count_online--;
           close (sock_id->msgsock);
           pthread_exit(NULL);
           break;
         case 10:
-           if(contato_online!=0){
+        if(contato!=NULL){
            msg.codigo=10;
-           printf("Envia para: %s e sock : %d\n", cli2.user_name, cli2.sock);
-           if (send (cli2.sock, (char *)&msg, sizeof msg, 0) < 0) 
+           printf("%d", contato->conteudo.online);
+           if(contato->conteudo.online==1){
+           printf("Envia para: %s e sock : %d\n", contato->conteudo.user_name, contato->conteudo.sock);
+           if (send (contato->conteudo.sock, (char *)&msg, sizeof msg, 0) < 0) 
                perror("Envio da mensagem");
            }
            else{
-             escrever_arquivo(cli2.user_name, cli.user_name, msg);
+             escrever_arquivo(contato->conteudo.user_name, cli.user_name, msg);
            }
+        }
           break;
         case 11:
           msg.codigo=12;
           msg.resposta=sock_id->msgsock;
-          if (send (cli2.sock, (char *)&msg, sizeof msg, 0) < 0) // notifica o outro usuario
+          if (send (contato->conteudo.sock, (char *)&msg, sizeof msg, 0) < 0) // notifica o outro usuario
             perror("Envio da mensagem");  
           break;
         case 12:
@@ -188,12 +217,12 @@ void *user(void * sock){
         default:
           break;
         }
+
           msg.codigo=-1;
       }
 		} while (1);
     pthread_exit(NULL);
 }
-
 
 
 int main(void)
