@@ -30,7 +30,7 @@ typedef struct clientes elemento;
 
 celula *lista = NULL;
 
-int count_online=1, count_total=1;
+int count_online=0, count_total=1;
 
 struct mensagem{
   int codigo;
@@ -94,6 +94,7 @@ void *user(void * sock){
           printf("Meu nome:%s\n", msg.buf);
           cli.online=1;
           sprintf(cli.user_name, "%s", msg.buf);
+          count_online++;
           msg.resposta=count_online;
           cli.sock=sock_id->msgsock;
           cliente=busca(cli, lista);
@@ -116,7 +117,7 @@ void *user(void * sock){
           perror("Envio da mensagem");
 
           
-          count_online++;
+ 
           break;
         case 2:
           msg.resposta=count_online;

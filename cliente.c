@@ -187,7 +187,7 @@ void menu_primario(int sock, struct sockaddr_in name, char *user_name){
     int menu;
     FILE *lista_de_contatos;
     lista_de_contatos=fopen("lista_de_contatos.txt", "a");
-    fclose(lista_de_contatos);
+    fclose(lista_de_contatos);  
     struct mensagem msg;
     int tam;
     tam=sizeof(name);
@@ -217,7 +217,7 @@ void usuarios_online(struct mensagem lista_nomes, char *meu_nome){
         lista = malloc(sizeof(lista_nomes.buf));
         printf("\nLista de Usuario Online\n");
         bcopy(lista_nomes.buf, lista, sizeof(lista_nomes.buf));
-        for(int i=0; i<lista_nomes.resposta-1; i++){
+        for(int i=0; i<lista_nomes.resposta; i++){
             if(strcmp(meu_nome, lista[i].user_name)!=0)
                 printf("%s\n",lista[i].user_name);
         }
@@ -267,10 +267,14 @@ void menu_secundario(int sock, struct sockaddr_in name, char * user_name, struct
             scanf("%s",msg2.buf);
             msg2.codigo=3;
             name.sin_family = AF_INET;
+            printf("Digite ""arquivo()"" para enviar um arquivo\n");
+            printf("Digite ""<voltar"" para retornar ao menu\n");
             if (send (sock, (char *)&msg2, sizeof msg2, 0) < 0) 
             perror("Envio da mensagem");
             pthread_mutex_lock(&lock3);
             if(resposta!=-1){
+                if(resposta==1) printf("Usuário Online\n");
+                if(resposta == 0) printf("Usuário Offline\n");
             while(1){
                 pthread_mutex_lock(&lock2);
 
@@ -303,6 +307,9 @@ void menu_secundario(int sock, struct sockaddr_in name, char * user_name, struct
                 }
             }
     
+            }
+            else{
+                printf("o usuario nao existe");
             }
             pthread_mutex_unlock(&lock3);
         }
@@ -408,7 +415,7 @@ void lista_de_contatos(struct mensagem lista_nomes, char *meu_nome){
 
 }
 void envia_arquivo(struct mensagem contato){
-    system("clear");
+ 
     int sock;
     sock = socket(AF_INET, SOCK_STREAM, 0);
     struct hostent *hp, *gethostbyname();
@@ -457,21 +464,25 @@ void envia_arquivo(struct mensagem contato){
         fseek(arquivo, 0, SEEK_END); // seek to end of file
         buff.size = ftell(arquivo); // get current file pointer
         fseek(arquivo, 0, SEEK_SET); // seek back to beginning of file
+        if (send (sock, (void *)&buff, sizeof(buff), 0) < 0)
+        perror("Envio da mensagem");
         // proceed with allocating memory and reading the file
        // buff.buffer = malloc(buff.size);
        // printf("Tamanho do arquivo: %d\n", buff.size);
         fread(buff.buffer,1, buff.size,arquivo);
         printf("Tamanho do arquivo: %d\n", buff.size);
         printf("Nome do arquivo: %s\n", buff.nome_arquivo);
+        usleep(250);
         if (send (sock, (void *)&buff, sizeof(buff), 0) < 0)
         perror("Envio da mensagem");
+
     }
     fclose(arquivo);
     close(sock);
       
 }
 void recebe_arquivo(int sock, int sock_contato){
-
+    struct send_file buff;
     
     int sock_serv;
     struct sockaddr_in serv;
@@ -510,9 +521,9 @@ void recebe_arquivo(int sock, int sock_contato){
     if (msgsock==-1)
 			perror("accept");
 
-    struct send_file buff;
 
-    if ((rval=recv(msgsock,(void *) &buff, sizeof(buff),0))<0){
+
+    if ((rval=recv(msgsock,(void *) &buff, sizeof(struct send_file),0))<0){
 	  perror("reading stream message");
     }
     else{
@@ -522,12 +533,15 @@ void recebe_arquivo(int sock, int sock_contato){
     //    nome_arquivo[strlen(nome_arquivo)-1]=0;
         FILE *arquivo;
         arquivo=fopen(buff.nome_arquivo, "w");
+        if ((rval=recv(msgsock,(void *) &buff, sizeof(struct send_file),0))<0){
+	  perror("reading stream message");
+    }
         //arquivo=fopen("1.txt", "w");
         if(arquivo ==NULL){
             printf("O arquivo nao pode ser aberto\n");
         }
         else{
-
+                
             // proceed with allocating memory and reading the file
  
             
@@ -541,7 +555,7 @@ void recebe_arquivo(int sock, int sock_contato){
     }
     close(msgsock);
     close(sock_serv);
-    printf("fim\n");
+
 
 }
 
