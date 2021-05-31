@@ -243,21 +243,23 @@ void menu_secundario(int sock, struct sockaddr_in name, char * user_name, struct
         printf("\n Escolha uma opção:");
         __fpurge(stdin);
         scanf("%d", &menu);
-        if(menu==1){ //l=usuarios online
+        switch (menu){
+
+        case 1: //l=usuarios online
 
             msg->codigo= 2;
             msg2.codigo=2;
             if (send (sock, (char *)&msg2, sizeof msg2, 0) < 0) 
             perror("Envio da mensagem");
-        }
-        if(menu==2){ //lista de contatos
+            break;
+        case 2: //lista de contatos
             msg->codigo= 4;
             msg2.codigo=4;
             if (send (sock, (char *)&msg2, sizeof msg2, 0) < 0) 
             perror("Envio da mensagem");
-
-        }
-        if(menu==3){ //iniciar conversa
+            break;
+        
+        case 3: //iniciar conversa
             system("clear");
             pthread_mutex_unlock(&lock);
             pthread_mutex_lock(&lock3);
@@ -312,8 +314,8 @@ void menu_secundario(int sock, struct sockaddr_in name, char * user_name, struct
                 printf("o usuario nao existe");
             }
             pthread_mutex_unlock(&lock3);
-        }
-        if(menu==4){
+            break;
+        case 4:
             printf("Realizando Descadastro\n");
             msg2.codigo=5;
                 if (send (sock, (char *)&msg2, sizeof msg2, 0) < 0) 
@@ -322,12 +324,12 @@ void menu_secundario(int sock, struct sockaddr_in name, char * user_name, struct
             pthread_mutex_destroy(&lock2);
             close(sock);
             exit(0);
-        }
-        if(menu==5){
+            break;
+        case 5:
             pthread_mutex_unlock(&lock);
             grupos(sock, user_name);
-        }
-        if(menu==6){
+            break;
+        case 6:
                 printf("Saindo.......");
                 msg2.codigo=6;
 
@@ -338,8 +340,11 @@ void menu_secundario(int sock, struct sockaddr_in name, char * user_name, struct
                 pthread_mutex_destroy(&lock2);
                 close(sock);
                 exit(0);
-
-            }
+                break;
+        default:
+            pthread_mutex_unlock(&lock);
+            break;
+        }
     }while(1);
 
 
